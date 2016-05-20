@@ -41,90 +41,95 @@ class RecursiveDescent(object):
                 else:
                     yield token
 
+
 # for path in RecursiveDescent(Lexer(test)):
 #     print(path)
 
 
 def scannit():
-	fname = 'example1.go'
-	
-	content = ""
-	with open(fname, 'r') as content_file:
-		content += content_file.read()
+    fname = 'example1.go'
 
-	# print "C:%s"%content
+    content = ""
+    with open(fname, 'r') as content_file:
+        content += content_file.read()
 
-	# Handle multiline import statements
-	m = re.compile(r'import\s*(\()\s*([^\(]*?)(\))|import\s*(\")(.*?)(\")',re.MULTILINE)
-	# m = re.search(r'import\s*\([^\)]*\)',content,re.MULTILINE)
+    # print "C:%s"%content
 
-	# import (...)  : r'import\s*(\()(.*?)(\))'
-	# import ".."   : r'import\s*(\")(.*?)(\")'
-	# // +build ... : r'\/\/\s*\+build\s(.*)'
-	# import\s*(\()\s*([^\(]*?)(\))|import\s*(\")(.*?)(\")
+    # Handle multiline import statements
+    m_import = re.compile(r'import\s*(\()\s*([^\(]*?)(\))|import\s*(\")(.*?)(\")', re.MULTILINE)
+    m_build = re.compile(r'\/\/\s*\+build\s(.*)')
+    # m = re.search(r'import\s*\([^\)]*\)',content,re.MULTILINE)
 
-	# print m.group(0),":",m.group(1),":",m.group(2),":",m.group(3),":",m.group(4),":",m.group(5),":",m.group(6)
+    # import (...)  : r'import\s*(\()(.*?)(\))'
+    # import ".."   : r'import\s*(\")(.*?)(\")'
+    # // +build ... : r'\/\/\s*\+build\s(.*)'
+    # import\s*(\()\s*([^\(]*?)(\))|import\s*(\")(.*?)(\")
 
-	for m in m.finditer(content):
-		# print m.group(0),":",m.group(1),":",m.group(2),":",m.group(3),":",m.group(4),":",m.group(5),":",m.group(6)
-		if m.group(1) == '(':
-			print "Import() "," ".join(m.group(2).splitlines())
-		else:
-			print "Import \"\"",m.group(5)
+    # print m.group(0),":",m.group(1),":",m.group(2),":",m.group(3),":",m.group(4),":",m.group(5),":",m.group(6)
+
+    for b in m_build.finditer(content):
+        if b.group(1):
+            print "BUILD:%s"%b.group(1)
+
+    for m in m_import.finditer(content):
+        # print m.group(0),":",m.group(1),":",m.group(2),":",m.group(3),":",m.group(4),":",m.group(5),":",m.group(6)
+        if m.group(1) == '(':
+            print "Import() ", " ".join(m.group(2).splitlines())
+        else:
+            print "Import \"\"", m.group(5)
             # print m.group(0),":",m.group(1),":",m.group(2),":",m.group(3),":",m.group(4),":",m.group(5),":",m.group(6)
 
 
 def lexit():
-	import shlex
+    import shlex
 
-	# fname = '/Users/bdbaddog/clients/mongodb/mongo-tools/vendor/src/github.com/3rf/mongo-lint/lint.go'
-	fname = 'example1.go'
+    # fname = '/Users/bdbaddog/clients/mongodb/mongo-tools/vendor/src/github.com/3rf/mongo-lint/lint.go'
+    fname = 'example1.go'
 
-	
-	content = ""
-	with open(fname, 'r') as content_file:
-		content += content_file.read()
+    content = ""
+    with open(fname, 'r') as content_file:
+        content += content_file.read()
 
-	lexer = shlex.shlex(content)
-	lexer.quotes = r'\'\"'
-	lexer.wordchars += '.\\/'
-	lexer.whitespace = ' \t\r'
+    lexer = shlex.shlex(content)
+    lexer.quotes = r'\'\"'
+    lexer.wordchars += '.\\/'
+    lexer.whitespace = ' \t\r'
 
-	print 'TOKENS:'
-	for token in lexer:
-	    print repr(token)
+    print 'TOKENS:'
+    for token in lexer:
+        print repr(token)
+
 
 def recParse():
-	fname = 'example1.go'
-	content = ""
-	with open(fname, 'r') as content_file:
-		content += content_file.read()
+    fname = 'example1.go'
+    content = ""
+    with open(fname, 'r') as content_file:
+        content += content_file.read()
 
-	for path in RecursiveDescent(Lexer(content)):
-	    print(path)
+    for path in RecursiveDescent(Lexer(content)):
+        print(path)
 
 
 def parseIt():
-	fname = 'example1.go'
-	content = ""
-	with open(fname, 'r') as content_file:
-		content += content_file.read()
+    fname = 'example1.go'
+    content = ""
+    with open(fname, 'r') as content_file:
+        content += content_file.read()
 
-	rx = re.compile(r'import\s+([^(]+?$|\([^)]+\))', re.MULTILINE)
-	rx2 = re.compile(r'".*"', re.MULTILINE)
+    rx = re.compile(r'import\s+([^(]+?$|\([^)]+\))', re.MULTILINE)
+    rx2 = re.compile(r'".*"', re.MULTILINE)
 
-	for m in rx.finditer(content):
-	    imp = m.group(1)
-	    if imp[0] == '(':
-	        for m in rx2.finditer(imp):
-	            print("rx2:",m.group(0))
-	    else:
-	        print("rx:",m.group(1))
-
+    for m in rx.finditer(content):
+        imp = m.group(1)
+        if imp[0] == '(':
+            for m2 in rx2.finditer(imp):
+                print("rx2:", m2.group(0))
+        else:
+            print("rx:", m.group(1))
 
 
 if __name__ == "__main__":
-	scannit()
-	# lexit()
-	# recParse()
-	#parseIt()
+    scannit()
+    # lexit()
+    # recParse()
+    # parseIt()
