@@ -22,7 +22,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 # License/Copyright notice for copied/referenced code
 
-## List of valid goos and goarch copied from golang repo requiring the following copyright notice
+## Use of some code from [golang repo](https://github.com/golang/go) requires inclusion of the following
+[File where list of goos and goarch were sourced](https://github.com/golang/go/blob/master/src/go/build/syslist.go)
 Copyright (c) 2012 The Go Authors. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
