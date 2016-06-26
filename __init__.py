@@ -26,10 +26,12 @@
 
 import SCons.Tool
 import SCons.Action
-from SCons.Scanner import Scanner
-from SCons.Defaults import ObjSourceScan, ArAction
+from SCons.Scanner import Scanner, FindPathDirs
+from SCons.Defaults import ObjSourceScan
 import os.path
+import re
 import string
+import pdb
 
 # Handle multiline import statements
 m_import = re.compile(r'import\s*(\()\s*([^\(]*?)(\))|import\s*(\")(.*?)(\")', re.MULTILINE)
@@ -64,6 +66,38 @@ def check_go_file(node,env):
 
     return process_file
 
+def is_not_go_standard_library(env, packagename):
+    """ Check with go if the imported module is part of
+    Go's standard library"""
+
+    # TODO
+    # cache output of "go list ..." (list all packages)
+    # and remove output from "go list ./..." (list all packages in current GOPATH
+    return True
+
+def expand_go_packages_to_files(env, gopackage, path):
+    """
+    Use GOPATH and package name to find directory where package is located and then scan
+    the directory for go packages. Return complete list of found files
+    TODO: filter found files by normal go file pruning (matching GOOS,GOOARCH,
+         and //+build statements in files
+    :param env:
+    :param gopackage:
+    :return:
+    """
+    go_files = []
+
+    for p in path:
+        print "Path:%s/%s"%(p,gopackage)
+        go_files = p.glob("%s/*.go"%gopackage)
+        for f in go_files:
+            print "File:%s"%f.abspath
+        if len(go_files) > 0:
+            # If we found packages files in this path, the don't continue searching GOPATH
+            break
+
+    return go_files
+
 def importedModules(node, env, path):
     """ Find all the imported modules. """
 
@@ -71,8 +105,13 @@ def importedModules(node, env, path):
     if not os.path.isfile(str(node)):
         return []
 
+    packages = []
     deps = []
 
+    print "Paths to search: %s"%path
+    print "Node PATH      : %s"%node.path
+
+    content = node.get_contents()
     for b in m_build.finditer(content):
         if b.group(1):
             print "BUILD:%s"%b.group(1)
@@ -80,12 +119,21 @@ def importedModules(node, env, path):
 
     for m in m_import.finditer(content):
         if m.group(1) == '(':
-            print "Import() ", " ".join(m.group(2).splitlines())
-            deps.extend(m.group(2).splitlines)
+            imports = [ x.strip('"\t') for x in m.group(2).splitlines()]
+            print "Import() ", " ".join(imports)
+            packages.extend(imports)
         else:
             # single line import statements
             print "Import \"\"", m.group(5)
-            deps.append(m.group(5))
+            packages.append(m.group(5))
+
+    print "packages:%s"%packages
+
+    import_packages = [ gopackage for gopackage in packages if is_not_go_standard_library(env, gopackage)]
+
+    for gopackage in import_packages:
+        deps += expand_go_packages_to_files(env,gopackage,path)
+
 
     return deps
 
@@ -99,11 +147,11 @@ def generate(env):
 
     linkAction = SCons.Action.Action("$GOLINK")
 
-
     goScanner = Scanner(function=importedModules,
                         scan_check=check_go_file,
                         name="goScanner",
                         skeys=goSuffixes,
+                        path_function=FindPathDirs('GOPATH'),
                         recursive=False)
 
     goProgram = SCons.Builder.Builder(action=linkAction,
@@ -113,15 +161,15 @@ def generate(env):
                                       src_builder="goObject")
     env["BUILDERS"]["goProgram"] = goProgram
 
-    goLibrary = SCons.Builder.Builder(action=SCons.Defaults.ArAction,
-                                      prefix="$LIBPREFIX",
-                                      suffix="$LIBSUFFIX",
-                                      src_suffix="$OBJSUFFIX",
-                                      src_builder="goObject")
-    env["BUILDERS"]["goLibrary"] = goLibrary
+    # goLibrary = SCons.Builder.Builder(action=SCons.Defaults.ArAction,
+    #                                   prefix="$LIBPREFIX",
+    #                                   suffix="$LIBSUFFIX",
+    #                                   src_suffix="$OBJSUFFIX",
+    #                                   src_builder="goObject")
+    # env["BUILDERS"]["goLibrary"] = goLibrary
 
     goObject = SCons.Builder.Builder(action=compileAction,
-                                     emitter=addgoInterface,
+                                     # emitter=addgoInterface,
                                      prefix="$OBJPREFIX",
                                      suffix="$OBJSUFFIX",
                                      src_suffix=goSuffixes,
