@@ -62,8 +62,6 @@ def check_go_file(node,env):
 
     file_abspath = node.abspath
 
-
-
     return process_file
 
 def is_not_go_standard_library(env, packagename):
@@ -88,10 +86,10 @@ def expand_go_packages_to_files(env, gopackage, path):
     go_files = []
 
     for p in path:
-        print "Path:%s/%s"%(p,gopackage)
+        # print "Path:%s/%s"%(p,gopackage)
         go_files = p.glob("%s/*.go"%gopackage)
-        for f in go_files:
-            print "File:%s"%f.abspath
+        # for f in go_files:
+        #     print "File:%s"%f.abspath
         if len(go_files) > 0:
             # If we found packages files in this path, the don't continue searching GOPATH
             break
@@ -108,8 +106,8 @@ def importedModules(node, env, path):
     packages = []
     deps = []
 
-    print "Paths to search: %s"%path
-    print "Node PATH      : %s"%node.path
+    # print "Paths to search: %s"%path
+    # print "Node PATH      : %s"%node.path
 
     content = node.get_contents()
     for b in m_build.finditer(content):
@@ -134,18 +132,28 @@ def importedModules(node, env, path):
     for gopackage in import_packages:
         deps += expand_go_packages_to_files(env,gopackage,path)
 
-
     return deps
 
 
 def generate(env):
-    env["go"] = env.Detect("go") or env.Detect("gnugo")
+    go_suffix = '.go'
+
+    import SCons.Tool
+    static_obj, shared_obj = SCons.Tool.createObjBuilders(env)
+    static_obj.add_emitter(go_suffix, SCons.Defaults.StaticObjectEmitter)
+    shared_obj.add_emitter(go_suffix, SCons.Defaults.SharedObjectEmitter)
+
+    env['GO'] = env.Detect("go") or env.Detect("gnugo") or "ECHO"
+
+    go_path = env.WhereIs(env['GO'])
+    # env['ENV']['GOROOT'] = os.path.dirname(os.path.dirname(go_path))
+    env['ENV']['GOPATH'] = env.get('GOPATH','.')
 
     goSuffixes = [".go"]
 
-    compileAction = SCons.Action.Action("$GOCOM")
+    compileAction = SCons.Action.Action("$GOCOM","$GOCOMSTR")
 
-    linkAction = SCons.Action.Action("$GOLINK")
+    linkAction = SCons.Action.Action("$GOLINK","$GOLINKSTR")
 
     goScanner = Scanner(function=importedModules,
                         scan_check=check_go_file,
@@ -181,7 +189,10 @@ def generate(env):
     # TODO: Document all the GO variables.
     env["GOOS"] = "$TARGET_OS"
     env["GOARCH"] = "$TARGET_ARCH"
-    env["GOFLAGS"] = None
+    env["GOFLAGS"] = env['GOFLAGS'] or None
+    env['GOCOM'] = '$GO build $GOFLAGS $SOURCES'
+    env['GOCOMSTR'] = '$GOCOM'
+
 
 def exists(env):
     return env.Detect("go") or env.Detect("gnugo")
