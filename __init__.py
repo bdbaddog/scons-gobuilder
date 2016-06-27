@@ -143,7 +143,7 @@ def generate(env):
     static_obj.add_emitter(go_suffix, SCons.Defaults.StaticObjectEmitter)
     shared_obj.add_emitter(go_suffix, SCons.Defaults.SharedObjectEmitter)
 
-    env['GO'] = env.Detect("go") or env.Detect("gnugo") or "ECHO"
+    env['GO'] = env.get('GO',False) or env.Detect("go") or env.Detect("gnugo") or "ECHO"
 
     go_path = env.WhereIs(env['GO'])
     # env['ENV']['GOROOT'] = os.path.dirname(os.path.dirname(go_path))
