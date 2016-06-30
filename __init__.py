@@ -25,7 +25,8 @@
 
 
 import SCons.Tool
-import SCons.Action
+from SCons.Builder import Builder
+from SCons.Action import Action
 from SCons.Scanner import Scanner, FindPathDirs
 from SCons.Defaults import ObjSourceScan
 import os.path
@@ -135,25 +136,31 @@ def importedModules(node, env, path):
     return deps
 
 
+def _go_emitter(target, source, env):
+    if len(source) == 1:
+        target.append(str(source).replace('.go',''))
+    return target, source
+
 def generate(env):
     go_suffix = '.go'
 
-    import SCons.Tool
-    static_obj, shared_obj = SCons.Tool.createObjBuilders(env)
-    static_obj.add_emitter(go_suffix, SCons.Defaults.StaticObjectEmitter)
-    shared_obj.add_emitter(go_suffix, SCons.Defaults.SharedObjectEmitter)
 
-    env['GO'] = env.get('GO',False) or env.Detect("go") or env.Detect("gnugo") or "ECHO"
+    go_binaries = ['go','gccgo-go','gccgo']
+
+    # If user as set GO, honor it, otherwise try finding any of the expected go binaries
+    env['GO'] = env.get('GO',False) or env.Detect(['go','gccgo-go'])  or "ECHO"
 
     go_path = env.WhereIs(env['GO'])
+    # Typically this would be true, but it shouldn't need to be set if
+    # We're using the "go" binary from either google or gcc go.
     # env['ENV']['GOROOT'] = os.path.dirname(os.path.dirname(go_path))
     env['ENV']['GOPATH'] = env.get('GOPATH','.')
 
     goSuffixes = [".go"]
 
-    compileAction = SCons.Action.Action("$GOCOM","$GOCOMSTR")
+    compileAction = Action("$GOCOM","$GOCOMSTR")
 
-    linkAction = SCons.Action.Action("$GOLINK","$GOLINKSTR")
+    linkAction = Action("$GOLINK","$GOLINKSTR")
 
     goScanner = Scanner(function=importedModules,
                         scan_check=check_go_file,
@@ -162,11 +169,12 @@ def generate(env):
                         path_function=FindPathDirs('GOPATH'),
                         recursive=False)
 
-    goProgram = SCons.Builder.Builder(action=linkAction,
-                                      prefix="$PROGPREFIX",
-                                      suffix="$PROGSUFFIX",
-                                      src_suffix="$OBJSUFFIX",
-                                      src_builder="goObject")
+    goProgram = Builder(action=linkAction,
+                        prefix="$PROGPREFIX",
+                        suffix="$PROGSUFFIX",
+                        source_scanner=goScanner,
+                        src_suffix=".go",
+                        src_builder="goObject")
     env["BUILDERS"]["goProgram"] = goProgram
 
     # goLibrary = SCons.Builder.Builder(action=SCons.Defaults.ArAction,
@@ -176,13 +184,14 @@ def generate(env):
     #                                   src_builder="goObject")
     # env["BUILDERS"]["goLibrary"] = goLibrary
 
-    goObject = SCons.Builder.Builder(action=compileAction,
-                                     # emitter=addgoInterface,
-                                     prefix="$OBJPREFIX",
-                                     suffix="$OBJSUFFIX",
-                                     src_suffix=goSuffixes,
-                                     source_scanner=goScanner)
-    env["BUILDERS"]["goObject"] = goObject
+    # goObject = Builder(action=compileAction,
+    #                    # emitter=addgoInterface,
+    #                    # emitter=_go_emitter,
+    #                    prefix="$OBJPREFIX",
+    #                    suffix="$OBJSUFFIX",
+    #                    src_suffix=goSuffixes,
+    #                    source_scanner=goScanner)
+    # env["BUILDERS"]["goObject"] = goObject
 
     # initialize GOOS and GOARCH
     # TODO: Validate the values of each to make sure they are valid for GO.
@@ -192,6 +201,17 @@ def generate(env):
     env["GOFLAGS"] = env['GOFLAGS'] or None
     env['GOCOM'] = '$GO build $GOFLAGS $SOURCES'
     env['GOCOMSTR'] = '$GOCOM'
+    env['GOLINK'] = '$GO build -o $TARGET $GOFLAGS $SOURCES'
+    env['GOLINKSTR'] = '$GOLINK'
+
+    # import SCons.Tool
+    # static_obj, shared_obj = SCons.Tool.createObjBuilders(env)
+    # static_obj.add_action(go_suffix, compileAction)
+    # shared_obj.add_action(go_suffix, compileAction)
+    #
+    # static_obj.add_emitter(go_suffix, SCons.Defaults.StaticObjectEmitter)
+    # shared_obj.add_emitter(go_suffix, SCons.Defaults.SharedObjectEmitter)
+
 
 
 def exists(env):

@@ -6,3 +6,5 @@ The builder will handle:
 
 * Importing modules with either single line or multi-line import statements
 * Implement file selection/filtering based on filename and/or //+build statements in code.
+* Google Go compiler
+* GCC GO compiler version >= 5.0
