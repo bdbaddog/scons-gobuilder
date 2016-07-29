@@ -164,32 +164,13 @@ def _create_env_for_subprocess(env):
 
 
 def _get_system_packages(env):
-    # # cmdline = "PATH=%s"%env['ENV']['PATH'] + " GOPATH=%s "%env.Dir('.').abspath + env.subst('$GO')+ " list ..."
-    # cmdline = env.subst('$GO')+ " list ..."
-    #
-    # print "CMDLINE:%s"%cmdline
-    # # packages = os.popen(env.subst('$GO')+ " list ...").readlines()
-    # # print "PACKAGES: %s"%packages
-    #
-    #
-    # popen = _subproc(env,
-    #                          cmdline,
-    #                          stdin = 'devnull',
-    #                          stdout=subprocess.PIPE,
-    #                          stderr=subprocess.PIPE)
-    #
-    # # Use the .stdout and .stderr attributes directly because the
-    # # .communicate() method uses the threading module on Windows
-    # # and won't work under Pythons not built with threading.
-    # stdout = popen.stdout.read()
-    # stderr = popen.stderr.read()
 
     # use
     subp_env = _create_env_for_subprocess(env)
 
-    all_packages = set(subprocess.check_output(["/usr/bin/go", "list", "..."], env=subp_env).split())
+    all_packages = set(subprocess.check_output([env.subst('$GO'), "list", "..."], env=subp_env).split())
 
-    proj_packages = set(subprocess.check_output(["/usr/bin/go", "list", "./..."], env=subp_env).split())
+    proj_packages = set(subprocess.check_output([env.subst('$GO'), "list", "./..."], env=subp_env).split())
 
     # pdb.set_trace()
 
