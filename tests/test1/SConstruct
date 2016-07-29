@@ -1,0 +1,26 @@
+# -*- mode:python; coding:utf-8; -*-
+
+env=Environment()
+env['GOPATH'] = ['vendor',]
+env['GOFLAGS'] = ' -x '
+# env['GO'] = 'gccgo-go'
+# env.AppendENVPath('PATH','/home/bdbaddog/tools/mongodbtoolchain/v2/bin')
+env.Tool('scons-gobuilder',toolpath=['../../..'])
+
+
+# env.goObject('src/ex3/hello-world.go')
+
+env.goProgram('hello-world',['src/ex3/hello-world.go',])
+
+print(env.Dump('ENV'))
+for f in env._dict.keys():
+    if f.startswith('GO'):
+        print("%s->%s"%(f,env[f]))
+
+
+# x=FindPathDirs('GOPATH')
+#
+# for p in x(env):
+#     print("-->%s"%p)
+
+
