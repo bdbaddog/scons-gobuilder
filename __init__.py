@@ -26,13 +26,15 @@
 
 import SCons.Tool
 from SCons.Builder import Builder
-from SCons.Action import Action
+from SCons.Action import Action, _subproc
 from SCons.Scanner import Scanner, FindPathDirs
 from SCons.Defaults import ObjSourceScan
 import os.path
+import os
 import re
 import string
 import pdb
+import subprocess
 
 # Handle multiline import statements
 m_import = re.compile(r'import\s*(\()\s*([^\(]*?)(\))|import\s*(\")(.*?)(\")', re.MULTILINE)
@@ -136,6 +138,67 @@ def importedModules(node, env, path):
     return deps
 
 
+is_String = SCons.Util.is_String
+is_List = SCons.Util.is_List
+
+
+def _create_env_for_subprocess(env):
+    # Ensure that the ENV values are all strings:
+    new_env = dict()
+    for key, value in env['ENV'].items():
+        if is_List(value):
+            # If the value is a list, then we assume it is a path list,
+            # because that's a pretty common list-like value to stick
+            # in an environment variable:
+            value = SCons.Util.flatten_sequence(value)
+            new_env[key] = os.pathsep.join(map(str, value))
+        else:
+            # It's either a string or something else.  If it's a string,
+            # we still want to call str() because it might be a *Unicode*
+            # string, which makes subprocess.Popen() gag.  If it isn't a
+            # string or a list, then we just coerce it to a string, which
+            # is the proper way to handle Dir and File instances and will
+            # produce something reasonable for just about everything else:
+            new_env[key] = str(value)
+    return new_env
+
+
+def _get_system_packages(env):
+    # # cmdline = "PATH=%s"%env['ENV']['PATH'] + " GOPATH=%s "%env.Dir('.').abspath + env.subst('$GO')+ " list ..."
+    # cmdline = env.subst('$GO')+ " list ..."
+    #
+    # print "CMDLINE:%s"%cmdline
+    # # packages = os.popen(env.subst('$GO')+ " list ...").readlines()
+    # # print "PACKAGES: %s"%packages
+    #
+    #
+    # popen = _subproc(env,
+    #                          cmdline,
+    #                          stdin = 'devnull',
+    #                          stdout=subprocess.PIPE,
+    #                          stderr=subprocess.PIPE)
+    #
+    # # Use the .stdout and .stderr attributes directly because the
+    # # .communicate() method uses the threading module on Windows
+    # # and won't work under Pythons not built with threading.
+    # stdout = popen.stdout.read()
+    # stderr = popen.stderr.read()
+
+    # use
+    subp_env = _create_env_for_subprocess(env)
+
+    all_packages = set(subprocess.check_output(["/usr/bin/go", "list", "..."], env=subp_env).split())
+
+    proj_packages = set(subprocess.check_output(["/usr/bin/go", "list", "./..."], env=subp_env).split())
+
+    # pdb.set_trace()
+
+    print "All PACKAGES: %s" % all_packages
+    print "    PACKAGES: %s" % proj_packages
+    print "GlobPackages: %s" % str(all_packages - proj_packages)
+    # print "PACKAGES: %s" % [s for s in stdout]
+
+
 def _go_emitter(target, source, env):
     if len(source) == 1:
         target.append(str(source).replace('.go',''))
@@ -154,7 +217,13 @@ def generate(env):
     # Typically this would be true, but it shouldn't need to be set if
     # We're using the "go" binary from either google or gcc go.
     # env['ENV']['GOROOT'] = os.path.dirname(os.path.dirname(go_path))
+    # GOROOT points to where go environment is setup.
+    # Only need to set GOROOT if GO is not in your path..  check if there's a dirsep in the GO path
+    # gcc go has implicit GOROOT and it's where --prefix pointed when built.
+    # Only honor user provide GOROOT. otherwise don't specify.
     env['ENV']['GOPATH'] = env.get('GOPATH','.')
+
+    _get_system_packages(env)
 
     goSuffixes = [".go"]
 
