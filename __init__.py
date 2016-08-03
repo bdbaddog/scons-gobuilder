@@ -71,10 +71,10 @@ def is_not_go_standard_library(env, packagename):
     """ Check with go if the imported module is part of
     Go's standard library"""
 
-    # TODO
-    # cache output of "go list ..." (list all packages)
-    # and remove output from "go list ./..." (list all packages in current GOPATH
-    return True
+    #TODO: What to do when there's a system package and a package in the project with the same name
+
+
+    return packagename not in env['GO_SYSTEM_PACKAGES']
 
 def expand_go_packages_to_files(env, gopackage, path):
     """
@@ -89,10 +89,10 @@ def expand_go_packages_to_files(env, gopackage, path):
     go_files = []
 
     for p in path:
-        # print "Path:%s/%s"%(p,gopackage)
-        go_files = p.glob("%s/*.go"%gopackage)
-        # for f in go_files:
-        #     print "File:%s"%f.abspath
+        print "Path:%s/src/%s"%(p,gopackage)
+        go_files = p.glob("src/%s/*.go"%gopackage)
+        for f in go_files:
+            print "File:%s"%f.abspath
         if len(go_files) > 0:
             # If we found packages files in this path, the don't continue searching GOPATH
             break
@@ -143,6 +143,10 @@ is_List = SCons.Util.is_List
 
 
 def _create_env_for_subprocess(env):
+    """ Create string-ified environment to pass to subprocess
+    This logic is mostly copied from SCons.Action._subproc
+    """
+
     # Ensure that the ENV values are all strings:
     new_env = dict()
     for key, value in env['ENV'].items():
@@ -173,11 +177,13 @@ def _get_system_packages(env):
     proj_packages = set(subprocess.check_output([env.subst('$GO'), "list", "./..."], env=subp_env).split())
 
     # pdb.set_trace()
+    system_packages = all_packages - proj_packages
 
-    print "All PACKAGES: %s" % all_packages
-    print "    PACKAGES: %s" % proj_packages
-    print "GlobPackages: %s" % str(all_packages - proj_packages)
+    # print "All PACKAGES: %s" % all_packages
+    # print "    PACKAGES: %s" % proj_packages
+    # print "GlobPackages: %s" % system_packages
     # print "PACKAGES: %s" % [s for s in stdout]
+    env['GO_SYSTEM_PACKAGES'] = list(system_packages)
 
 
 def _go_emitter(target, source, env):
@@ -204,6 +210,8 @@ def generate(env):
     # Only honor user provide GOROOT. otherwise don't specify.
     env['ENV']['GOPATH'] = env.get('GOPATH','.')
 
+    # Populate GO_SYSTEM_PACKAGES
+    # TODO: Add documentation for GO_SYSTEM_PACKAGES
     _get_system_packages(env)
 
     goSuffixes = [".go"]

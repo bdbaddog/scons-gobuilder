@@ -1,7 +1,7 @@
 # -*- mode:python; coding:utf-8; -*-
 
 env=Environment()
-env['GOPATH'] = ['vendor',]
+env['GOPATH'] = ['vendor', Dir('.').abspath]
 env['GOFLAGS'] = ' -x '
 env['GO'] = '/usr/bin/go'
 # env.AppendENVPath('PATH','/home/bdbaddog/tools/mongodbtoolchain/v2/bin')
