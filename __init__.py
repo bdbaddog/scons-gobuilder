@@ -65,6 +65,11 @@ def check_go_file(node,env):
 
     file_abspath = node.abspath
 
+    if '_test' in file_abspath: process_file = False
+
+    print "check_go_File:%s  Process:%s"%(file_abspath,process_file)
+
+
     return process_file
 
 def is_not_go_standard_library(env, packagename):
@@ -75,6 +80,21 @@ def is_not_go_standard_library(env, packagename):
 
 
     return packagename not in env['GO_SYSTEM_PACKAGES']
+
+def include_go_file(env,file):
+    """
+    Use file name (and also scan for +build statements in file to determine
+    if this file should be compiled and/or added to dependency tree
+    :param env: Environment being used to compile this file
+    :param file: The file in question
+    :return: Boolean indicating if this file should be included
+    """
+
+    include_file = True
+
+    if '_test' in file.abspath: include_file = False
+
+    return include_file
 
 def expand_go_packages_to_files(env, gopackage, path):
     """
@@ -91,11 +111,26 @@ def expand_go_packages_to_files(env, gopackage, path):
     for p in path:
         print "Path:%s/src/%s"%(p,gopackage)
         go_files = p.glob("src/%s/*.go"%gopackage)
+        count=0
         for f in go_files:
-            print "File:%s"%f.abspath
+            print "(%4d) File:%s  Test:%s"%(count,f.abspath,('_test' in f.abspath))
+            count += 1
         if len(go_files) > 0:
             # If we found packages files in this path, the don't continue searching GOPATH
             break
+
+    # print "filtering test files"
+    # for f in go_files:
+    #     print "%s : %s"%(type(f), f)
+    try:
+        go_files = [ f for f in go_files if include_go_file(env,f)]
+    except TypeError as e:
+        print "TypeError is %s %s"%(e,f)
+    # print "done filtering test files"
+    # count = 0
+    # for f in go_files:
+    #     print "X(%4d) File:%s  Test:%s" % (count, f.abspath, ('_test' in f.abspath))
+    #     count += 1
 
     return go_files
 
@@ -225,7 +260,7 @@ def generate(env):
                         name="goScanner",
                         skeys=goSuffixes,
                         path_function=FindPathDirs('GOPATH'),
-                        recursive=False)
+                        recursive=True)
 
     goProgram = Builder(action=linkAction,
                         prefix="$PROGPREFIX",
