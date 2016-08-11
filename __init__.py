@@ -92,7 +92,21 @@ def include_go_file(env,file):
 
     include_file = True
 
-    if '_test' in file.abspath: include_file = False
+    # First filter based on file name
+    file_parts = file.name.split('.')[0].split('_')
+    print "parts:%s"%file_parts
+
+    if file_parts[-1] == 'test':
+        include_file = False
+    elif file_parts[-1] != env['GOOS'] and file_parts[-1] in _goosList:
+        include_file = False
+    elif file_parts[-1] != env['GOARCH'] and file_parts[-1] in _goarchList:
+        include_file = False
+    elif file_parts[-1] == env['GOARCH'] and file_parts[-2] != env['GOOS'] and file_parts[-2] in _goosList:
+        include_file = False
+
+    if not include_file:
+        print "Rejecting: %s"%file.name
 
     return include_file
 
@@ -113,7 +127,7 @@ def expand_go_packages_to_files(env, gopackage, path):
         go_files = p.glob("src/%s/*.go"%gopackage)
         count=0
         for f in go_files:
-            print "(%4d) File:%s  Test:%s"%(count,f.abspath,('_test' in f.abspath))
+            # print "(%4d) File:%s  Test:%s"%(count,f.abspath,('_test' in f.abspath))
             count += 1
         if len(go_files) > 0:
             # If we found packages files in this path, the don't continue searching GOPATH
@@ -127,7 +141,7 @@ def expand_go_packages_to_files(env, gopackage, path):
     except TypeError as e:
         print "TypeError is %s %s"%(e,f)
     # print "done filtering test files"
-    # count = 0
+    count = 0
     # for f in go_files:
     #     print "X(%4d) File:%s  Test:%s" % (count, f.abspath, ('_test' in f.abspath))
     #     count += 1
@@ -242,7 +256,6 @@ def _go_emitter(target, source, env):
 def generate(env):
     go_suffix = '.go'
 
-
     go_binaries = ['go','gccgo-go','gccgo']
 
     # If user as set GO, honor it, otherwise try finding any of the expected go binaries
@@ -302,8 +315,8 @@ def generate(env):
     # initialize GOOS and GOARCH
     # TODO: Validate the values of each to make sure they are valid for GO.
     # TODO: Document all the GO variables.
-    env["GOOS"] = "$TARGET_OS"
-    env["GOARCH"] = "$TARGET_ARCH"
+    env["GOOS"] = 'linux' # "$TARGET_OS"
+    env["GOARCH"] = 'amd64' # "$TARGET_ARCH"
     env["GOFLAGS"] = env['GOFLAGS'] or None
     env['GOCOM'] = '$GO build $GOFLAGS $SOURCES'
     env['GOCOMSTR'] = '$GOCOM'
