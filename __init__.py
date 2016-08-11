@@ -37,7 +37,7 @@ import pdb
 import subprocess
 
 # Handle multiline import statements
-m_import = re.compile(r'import\s*(\()\s*([^\(]*?)(\))|import\s*(\")(.*?)(\")', re.MULTILINE)
+m_import = re.compile(r'import\s*(?P<paren>\()\s*(?P<package_names>[^\(]*?)(\))|import\s*(?P<quote>\")(?P<package_name>.*?)(\")', re.MULTILINE)
 
 # Handle +build statements
 m_build = re.compile(r'\/\/\s*\+build\s(.*)')
@@ -134,7 +134,8 @@ def expand_go_packages_to_files(env, gopackage, path):
 
     return go_files
 
-def importedModules(node, env, path):
+
+def imported_modules(node, env, path):
     """ Find all the imported modules. """
 
     # Does the node exist yet?
@@ -154,8 +155,9 @@ def importedModules(node, env, path):
 
 
     for m in m_import.finditer(content):
-        if m.group(1) == '(':
-            imports = [ x.strip('"\t') for x in m.group(2).splitlines()]
+        match_dict = m.groupdict()
+        if match_dict['paren']:
+            imports = [ x.strip(' "\t') for x in m.group(2).splitlines()]
             print "Import() ", " ".join(imports)
             packages.extend(imports)
         else:
@@ -163,9 +165,20 @@ def importedModules(node, env, path):
             print "Import \"\"", m.group(5)
             packages.append(m.group(5))
 
+
     print "packages:%s"%packages
 
-    import_packages = [ gopackage for gopackage in packages if is_not_go_standard_library(env, gopackage)]
+    # Add filter to handle package renaming as such
+    # import m "lib/math"         (where the contents of lib/math are accessible via m.SYMBOL
+    fixed_packages = []
+    for p in packages:
+        quote_pos = p.find('"')
+        if quote_pos != -1:
+            # Import statement has package name, remove it.
+            p = p[quote_pos+1:]
+        fixed_packages.append(p)
+
+    import_packages = [ gopackage for gopackage in fixed_packages if is_not_go_standard_library(env, gopackage)]
 
     for gopackage in import_packages:
         deps += expand_go_packages_to_files(env,gopackage,path)
@@ -255,7 +268,7 @@ def generate(env):
 
     linkAction = Action("$GOLINK","$GOLINKSTR")
 
-    goScanner = Scanner(function=importedModules,
+    goScanner = Scanner(function=imported_modules,
                         scan_check=check_go_file,
                         name="goScanner",
                         skeys=goSuffixes,
