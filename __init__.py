@@ -321,7 +321,7 @@ def generate(env):
 
     goSuffixes = [".go"]
 
-    compileAction = Action("$GOCOM","$GOCOMSTR")
+    # compileAction = Action("$GOCOM","$GOCOMSTR")
 
     linkAction = Action("$GOLINK","$GOLINKSTR")
 
@@ -361,10 +361,13 @@ def generate(env):
     # TODO: Document all the GO variables.
     env["GOOS"] = 'linux' # "$TARGET_OS"
     env["GOARCH"] = 'amd64' # "$TARGET_ARCH"
-    env["GOFLAGS"] = env['GOFLAGS'] or None
+
     env['_go_tags_flag'] = _go_tags
 
-    env['GOTAGS'] = 'GOTAGS' in env and env['GOTAGS'] or None
+    env["GOFLAGS"] = env["GOFLAGS"] or None
+
+    if 'GOTAGS' not in env:
+        env['GOTAGS'] = None
 
     env['GOCOM'] = '$GO build -o $TARGET ${_go_tags_flag} $GOFLAGS $SOURCES'
     env['GOCOMSTR'] = '$GOCOM'
