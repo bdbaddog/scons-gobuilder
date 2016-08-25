@@ -29,6 +29,7 @@ from SCons.Builder import Builder
 from SCons.Action import Action, _subproc
 from SCons.Scanner import Scanner, FindPathDirs
 from SCons.Defaults import ObjSourceScan
+import SCons.Subst
 import os.path
 import os
 import re
@@ -53,6 +54,37 @@ m_build = re.compile(r'\/\/\s*\+build\s(.*)')
 # https://github.com/golang/go/blob/master/LICENSE
 _goosList = "android darwin dragonfly freebsd linux nacl netbsd openbsd plan9 solaris windows".split()
 _goarchList = "386 amd64 amd64p32 arm armbe arm64 arm64be ppc64 ppc64le mips mipsle mips64 mips64le mips64p32 mips64p32le ppc s390 s390x sparc sparc64".split()
+
+# TODO: construct list of legal combinations
+#  Use: https://golang.org/doc/install/source#environment for current list.  (may vary by version of google go compiler)
+# android	arm
+# darwin	386
+# darwin	amd64
+# darwin	arm
+# darwin	arm64
+# dragonfly	amd64
+# freebsd	386
+# freebsd	amd64
+# freebsd	arm
+# linux	386
+# linux	amd64
+# linux	arm
+# linux	arm64
+# linux	ppc64
+# linux	ppc64le
+# linux	mips64
+# linux	mips64le
+# netbsd	386
+# netbsd	amd64
+# netbsd	arm
+# openbsd	386
+# openbsd	amd64
+# openbsd	arm
+# plan9	386
+# plan9	amd64
+# solaris	amd64
+# windows	386
+# windows	amd64
 
 def check_go_file(node,env):
     """
@@ -253,6 +285,18 @@ def _go_emitter(target, source, env):
         target.append(str(source).replace('.go',''))
     return target, source
 
+def _go_tags(target, source, env, for_signature):
+    """
+    Produce go tag arguments for command line
+    :param env:
+    :return:
+    """
+    print("TAGS:%s"%env['GOTAGS'])
+    retval = ''
+    if len(env['GOTAGS']) >= 1:
+        retval = ' -tags "$GOTAGS" '
+    return retval
+
 def generate(env):
     go_suffix = '.go'
 
@@ -318,10 +362,16 @@ def generate(env):
     env["GOOS"] = 'linux' # "$TARGET_OS"
     env["GOARCH"] = 'amd64' # "$TARGET_ARCH"
     env["GOFLAGS"] = env['GOFLAGS'] or None
-    env['GOCOM'] = '$GO build $GOFLAGS $SOURCES'
+    env['_go_tags_flag'] = _go_tags
+
+    env['GOTAGS'] = 'GOTAGS' in env and env['GOTAGS'] or None
+
+    env['GOCOM'] = '$GO build -o $TARGET ${_go_tags_flag} $GOFLAGS $SOURCES'
     env['GOCOMSTR'] = '$GOCOM'
-    env['GOLINK'] = '$GO build -o $TARGET $GOFLAGS $SOURCES'
+    env['GOLINK'] = '$GO build -o $TARGET ${_go_tags_flag} $GOFLAGS $SOURCES'
     env['GOLINKSTR'] = '$GOLINK'
+
+
 
     # import SCons.Tool
     # static_obj, shared_obj = SCons.Tool.createObjBuilders(env)

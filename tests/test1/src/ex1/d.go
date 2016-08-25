@@ -1,8 +1,9 @@
-// +build !wolf
+// +build wolf
 
 package ex1
+
 import "fmt"
 
 func Sub_sub_some_things(things string) {
-	fmt.Println(things)
+	fmt.Println("Wolf"+things)
 }

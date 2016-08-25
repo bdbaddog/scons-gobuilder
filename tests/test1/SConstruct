@@ -4,13 +4,14 @@ env=Environment()
 env['GOPATH'] = ['vendor', Dir('.').abspath]
 env['GOFLAGS'] = ' -x '
 env['GO'] = '/usr/bin/go'
+# env['GOTAGS'] = ['bill','is','awesome']
 # env.AppendENVPath('PATH','/home/bdbaddog/tools/mongodbtoolchain/v2/bin')
-env.Tool('scons-gobuilder',toolpath=['../../..'])
+env.Tool('scons-gobuilder',toolpath=['../../..'],)
 
 
 # env.goObject('src/ex3/hello-world.go')
 
-env.goProgram('hello-world',['src/ex3/hello-world.go',])
+env.goProgram('hello-world',['src/ex3/hello-world.go',])#,GOTAGS=['wolf'])
 
 print(env.Dump('ENV'))
 for f in env._dict.keys():
