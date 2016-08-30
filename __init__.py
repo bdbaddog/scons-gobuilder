@@ -93,6 +93,7 @@ def check_go_file(node,env):
     :param env: Environment()
     :return: Boolean value indicated whether to scan this file
     """
+
     process_file = True
 
     file_abspath = node.abspath
@@ -142,6 +143,7 @@ def include_go_file(env,file):
 
     return include_file
 
+
 def expand_go_packages_to_files(env, gopackage, path):
     """
     Use GOPATH and package name to find directory where package is located and then scan
@@ -181,6 +183,54 @@ def expand_go_packages_to_files(env, gopackage, path):
     return go_files
 
 
+def _eval_build_statement(env,statement):
+    """
+    Process a single build statement
+    :param env:
+    :param statement:
+    :return: Boolean indicating if satisfied
+    """
+    if statement[0] == '!':
+        return statement[1:] not in env['GOTAGS'] or statement[1:] in (env['GOOS'],env['GOARCH'])
+    else:
+        return statement  in env['GOTAGS'] or statement in (env['GOOS'],env['GOARCH'])
+
+
+def _eval_build_statements(env,build_statements,node):
+    """
+    Process // +build statements in source files as follows:
+    If more than one line of +build statements, then each lines logic is evaluated and
+    then AND'd with all other lines.
+    If there is a commma between two items on a build line that indicates AND'ing them,
+    otherwise all items space separated are OR'd.
+    :param env:
+    :param build_statements:  A list of build statements, each one representing a line extracted from the source file
+    :param node: The node being evaluated. Used for debug messaging.
+    :return: Boolean indicating whether the constraints are satisfied.
+    """
+
+    if not build_statements:
+        return True
+
+    # Split each line into a list of space separated parts
+    build_statement_parts = [bs.split(' ') for bs in build_statements]
+
+    retval = True
+
+    # import pdb;pdb.set_trace()
+    for line_parts in build_statement_parts:
+        line = False
+        for p in line_parts:
+            prv = reduce(lambda x, y: x and y,[_eval_build_statement(env, pp) for pp in  p.split(',')])
+            print "PARTS:%s =>%s"%(p,prv)
+            line = line or prv
+        retval = retval and line
+
+    print("_eval_build_statements:File:%s Process:%s"%(node.abspath,retval))
+
+    return retval
+
+
 def imported_modules(node, env, path):
     """ Find all the imported modules. """
 
@@ -190,33 +240,44 @@ def imported_modules(node, env, path):
 
     packages = []
     deps = []
+    build_statements = []
 
     # print "Paths to search: %s"%path
-    # print "Node PATH      : %s"%node.path
+    print "Node PATH      : %s"%node.path
 
     content = node.get_contents()
+
     for b in m_build.finditer(content):
         if b.group(1):
-            print "BUILD:%s"%b.group(1)
+            build_statements.append(b.group(1))
+
+    if len(build_statements) > 0:
+        print("+build statements (file:%s):%s"%(node.abspath,build_statements))
+
+    if not _eval_build_statements(env,build_statements,node):
+        print("SKIPPING %s"%node.abspath)
+        return []
+    print("BLAH:%s"%node.abspath)
 
 
     for m in m_import.finditer(content):
         match_dict = m.groupdict()
         if match_dict['paren']:
             imports = [ x.strip(' "\t') for x in m.group(2).splitlines()]
-            print "Import() ", " ".join(imports)
+            # print "Import() ", " ".join(imports)
             packages.extend(imports)
         else:
             # single line import statements
-            print "Import \"\"", m.group(5)
+            # print "Import \"\"", m.group(5)
             packages.append(m.group(5))
 
+    if packages:
+        print "packages:%s"%packages
 
-    print "packages:%s"%packages
 
+    fixed_packages = []
     # Add filter to handle package renaming as such
     # import m "lib/math"         (where the contents of lib/math are accessible via m.SYMBOL
-    fixed_packages = []
     for p in packages:
         quote_pos = p.find('"')
         if quote_pos != -1:
@@ -224,10 +285,12 @@ def imported_modules(node, env, path):
             p = p[quote_pos+1:]
         fixed_packages.append(p)
 
+
     import_packages = [ gopackage for gopackage in fixed_packages if is_not_go_standard_library(env, gopackage)]
 
     for gopackage in import_packages:
         deps += expand_go_packages_to_files(env,gopackage,path)
+
 
     return deps
 
@@ -285,17 +348,19 @@ def _go_emitter(target, source, env):
         target.append(str(source).replace('.go',''))
     return target, source
 
+
 def _go_tags(target, source, env, for_signature):
     """
     Produce go tag arguments for command line
     :param env:
     :return:
     """
-    print("TAGS:%s"%env['GOTAGS'])
+    print("ForSig:%s TAGS:%s"%(for_signature,env['GOTAGS']))
     retval = ''
     if len(env['GOTAGS']) >= 1:
         retval = ' -tags "$GOTAGS" '
     return retval
+
 
 def generate(env):
     go_suffix = '.go'
@@ -371,7 +436,7 @@ def generate(env):
 
     env['GOCOM'] = '$GO build -o $TARGET ${_go_tags_flag} $GOFLAGS $SOURCES'
     env['GOCOMSTR'] = '$GOCOM'
-    env['GOLINK'] = '$GO build -o $TARGET ${_go_tags_flag} $GOFLAGS $SOURCES'
+    env['GOLINK'] = '$GO build -o $TARGET $_go_tags_flag $GOFLAGS $SOURCES'
     env['GOLINKSTR'] = '$GOLINK'
 
 
@@ -383,7 +448,6 @@ def generate(env):
     #
     # static_obj.add_emitter(go_suffix, SCons.Defaults.StaticObjectEmitter)
     # shared_obj.add_emitter(go_suffix, SCons.Defaults.SharedObjectEmitter)
-
 
 
 def exists(env):

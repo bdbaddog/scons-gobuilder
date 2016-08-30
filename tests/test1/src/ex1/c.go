@@ -1,4 +1,6 @@
-// +build !wolf
+// +build !wolf,awesome
+
+
 
 package ex1
 import "fmt"

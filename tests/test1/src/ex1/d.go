@@ -1,4 +1,5 @@
 // +build wolf
+// +build zebra
 
 package ex1
 
