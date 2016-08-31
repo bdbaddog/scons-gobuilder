@@ -4,6 +4,8 @@ env=Environment()
 env['GOPATH'] = ['vendor', Dir('.').abspath]
 env['GOFLAGS'] = ' -x '
 env['GO'] = '/usr/bin/go'
+env['GO'] = '/home/bdbaddog/tools/mongodbtoolchain/v2/bin/go'
+
 env['GOTAGS'] = ['bill','is','awesome']
 # env.AppendENVPath('PATH','/home/bdbaddog/tools/mongodbtoolchain/v2/bin')
 env.Tool('scons-gobuilder',toolpath=['../../..'],)

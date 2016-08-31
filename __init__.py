@@ -86,6 +86,7 @@ _goarchList = "386 amd64 amd64p32 arm armbe arm64 arm64be ppc64 ppc64le mips mip
 # windows	386
 # windows	amd64
 
+
 def check_go_file(node,env):
     """
     Check if the node is either ready to scan now, or should be scanned
@@ -98,12 +99,13 @@ def check_go_file(node,env):
 
     file_abspath = node.abspath
 
-    if '_test' in file_abspath: process_file = False
+    if not include_go_file(env,node):
+        process_file = False
 
     print "check_go_File:%s  Process:%s"%(file_abspath,process_file)
 
-
     return process_file
+
 
 def is_not_go_standard_library(env, packagename):
     """ Check with go if the imported module is part of
@@ -113,6 +115,7 @@ def is_not_go_standard_library(env, packagename):
 
 
     return packagename not in env['GO_SYSTEM_PACKAGES']
+
 
 def include_go_file(env,file):
     """
@@ -190,10 +193,19 @@ def _eval_build_statement(env,statement):
     :param statement:
     :return: Boolean indicating if satisfied
     """
-    if statement[0] == '!':
-        return statement[1:] not in env['GOTAGS'] or statement[1:] in (env['GOOS'],env['GOARCH'])
+
+    if statement == None:
+        import pdb; pdb.set_trace()
+
+    if statement[0] == '!' and \
+            (statement[1:] not in (env['GOOS'],env['GOARCH'])) and \
+            (statement[1:] not in env.get('GOTAGS',[])):
+        return True
+    elif statement in env['GOTAGS'] or statement in (env['GOOS'],env['GOARCH']):
+        return True
     else:
-        return statement  in env['GOTAGS'] or statement in (env['GOOS'],env['GOARCH'])
+        return False
+
 
 
 def _eval_build_statements(env,build_statements,node):
@@ -221,8 +233,9 @@ def _eval_build_statements(env,build_statements,node):
     for line_parts in build_statement_parts:
         line = False
         for p in line_parts:
-            prv = reduce(lambda x, y: x and y,[_eval_build_statement(env, pp) for pp in  p.split(',')])
-            print "PARTS:%s =>%s"%(p,prv)
+            lpbool = [_eval_build_statement(env, pp) for pp in  p.split(',')]
+            prv = reduce(lambda x, y: x and y,lpbool)
+            print "PARTS:%s =>%s [%s]"%(p,prv,lpbool)
             line = line or prv
         retval = retval and line
 
@@ -325,6 +338,12 @@ def _create_env_for_subprocess(env):
 
 
 def _get_system_packages(env):
+    """
+    Determine list of system packages by subtracting the list of project packages from
+    the list of all packages known within the scope of the current project
+    :param env:
+    :return:
+    """
 
     # use
     subp_env = _create_env_for_subprocess(env)
@@ -333,7 +352,6 @@ def _get_system_packages(env):
 
     proj_packages = set(subprocess.check_output([env.subst('$GO'), "list", "./..."], env=subp_env).split())
 
-    # pdb.set_trace()
     system_packages = all_packages - proj_packages
 
     # print "All PACKAGES: %s" % all_packages
@@ -341,6 +359,34 @@ def _get_system_packages(env):
     # print "GlobPackages: %s" % system_packages
     # print "PACKAGES: %s" % [s for s in stdout]
     env['GO_SYSTEM_PACKAGES'] = list(system_packages)
+
+
+def _get_go_version_vendor(env):
+    """
+    Extract go version information from running 'go version'
+
+    Seems to come in two flavors:
+    gcc go    : go version go1.4.2 gccgo (GCC) 5.3.0 linux/amd64
+    google go : go version go1.2.1 linux/amd64
+    :param env:
+    :return:
+    """
+    subp_env = _create_env_for_subprocess(env)
+
+    version_parts = subprocess.check_output([env.subst('$GO'), "version"], env=subp_env).split()
+
+    go_version = version_parts[2][2:]
+    (go_os,go_arch) = version_parts[-1].split('/')
+
+    print("GO VERSION:%s GOOS:%s GOARCH:%s"%(go_version, go_os,go_arch))
+    env['GOHOSTOS'] = go_os
+    env['GOHOSTARCH'] = go_arch
+    env['GOVERSION'] = go_version
+
+    # print "All PACKAGES: %s" % all_packages
+    # print "    PACKAGES: %s" % proj_packages
+    # print "GlobPackages: %s" % system_packages
+    # print "PACKAGES: %s" % [s for s in stdout]
 
 
 def _go_emitter(target, source, env):
@@ -357,7 +403,7 @@ def _go_tags(target, source, env, for_signature):
     """
     print("ForSig:%s TAGS:%s"%(for_signature,env['GOTAGS']))
     retval = ''
-    if len(env['GOTAGS']) >= 1:
+    if env['GOTAGS']:
         retval = ' -tags "$GOTAGS" '
     return retval
 
@@ -383,6 +429,8 @@ def generate(env):
     # Populate GO_SYSTEM_PACKAGES
     # TODO: Add documentation for GO_SYSTEM_PACKAGES
     _get_system_packages(env)
+
+    _get_go_version_vendor(env)
 
     goSuffixes = [".go"]
 
@@ -424,15 +472,16 @@ def generate(env):
     # initialize GOOS and GOARCH
     # TODO: Validate the values of each to make sure they are valid for GO.
     # TODO: Document all the GO variables.
-    env["GOOS"] = 'linux' # "$TARGET_OS"
-    env["GOARCH"] = 'amd64' # "$TARGET_ARCH"
+
+    env['GOOS']   = env.get('GOOS',env['GOHOSTOS'])
+    env['GOARCH'] = env.get('GOARCH',env['GOHOSTARCH'])
 
     env['_go_tags_flag'] = _go_tags
 
     env["GOFLAGS"] = env["GOFLAGS"] or None
 
     if 'GOTAGS' not in env:
-        env['GOTAGS'] = None
+        env['GOTAGS'] = []
 
     env['GOCOM'] = '$GO build -o $TARGET ${_go_tags_flag} $GOFLAGS $SOURCES'
     env['GOCOMSTR'] = '$GOCOM'
