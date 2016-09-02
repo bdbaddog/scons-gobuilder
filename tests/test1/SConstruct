@@ -1,6 +1,7 @@
 # -*- mode:python; coding:utf-8; -*-
 
 env=Environment()
+
 env['GOPATH'] = ['vendor', Dir('.').abspath]
 env['GOFLAGS'] = ' -x '
 env['GO'] = '/usr/bin/go'
@@ -8,17 +9,21 @@ env['GO'] = '/home/bdbaddog/tools/mongodbtoolchain/v2/bin/go'
 
 env['GOTAGS'] = ['bill','is','awesome']
 # env.AppendENVPath('PATH','/home/bdbaddog/tools/mongodbtoolchain/v2/bin')
+# print("1GOPATH:"+env['GOPATH'])
 env.Tool('scons-gobuilder',toolpath=['../../..'],)
 
+# print("2GOPATH:"+env['GOPATH'])
 
 # env.goObject('src/ex3/hello-world.go')
 
 env.goProgram('hello-world',['src/ex3/hello-world.go',])#,GOTAGS=['wolf'])
+# print("3GOPATH:"+env['GOPATH'])
 
-print(env.Dump('ENV'))
-for f in env._dict.keys():
-    if f.startswith('GO'):
-        print("%s->%s"%(f,env[f]))
+if False:
+    print(env.Dump('ENV'))
+    for f in env._dict.keys():
+        if f.find('GO') != -1:
+            print("%s->%s"%(f,env[f]))
 
 
 # x=FindPathDirs('GOPATH')

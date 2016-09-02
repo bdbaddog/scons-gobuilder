@@ -55,6 +55,8 @@ m_build = re.compile(r'\/\/\s*\+build\s(.*)')
 _goosList = "android darwin dragonfly freebsd linux nacl netbsd openbsd plan9 solaris windows".split()
 _goarchList = "386 amd64 amd64p32 arm armbe arm64 arm64be ppc64 ppc64le mips mipsle mips64 mips64le mips64p32 mips64p32le ppc s390 s390x sparc sparc64".split()
 
+_goVersionTagsList = ['go1.%d'%v for v in xrange(1,8)]
+
 # TODO: construct list of legal combinations
 #  Use: https://golang.org/doc/install/source#environment for current list.  (may vary by version of google go compiler)
 # android	arm
@@ -155,6 +157,7 @@ def expand_go_packages_to_files(env, gopackage, path):
          and //+build statements in files
     :param env:
     :param gopackage:
+    :param path:
     :return:
     """
     go_files = []
@@ -186,16 +189,20 @@ def expand_go_packages_to_files(env, gopackage, path):
     return go_files
 
 
-def _eval_build_statement(env,statement):
+def _eval_build_statement(env,statement,all_tags):
     """
-    Process a single build statement
+    Process a single build statements arguments
     :param env:
     :param statement:
     :return: Boolean indicating if satisfied
     """
+    # pdb.set_trace()
 
-    if statement == None:
+    if statement is None:
         import pdb; pdb.set_trace()
+
+    invert = statement[0] == '!'
+    retval = False
 
     if statement[0] == '!' and \
             (statement[1:] not in (env['GOOS'],env['GOARCH'])) and \
@@ -206,6 +213,24 @@ def _eval_build_statement(env,statement):
     else:
         return False
 
+
+def _get_all_tags(env):
+
+    tags = []
+    tags.extend(env['GOTAGS'])
+    tags.append(env['GOOS'])
+    tags.append(env['GOARCH'])
+
+    if env.get('CGO_ENABLED',False):
+        tags.append('cgo')
+
+    go_version = int(env['GOVERSION'].split('.')[1]) # strip '1.' and '.x' and just get middle version
+    tags.extend(_goVersionTagsList[0:go_version])
+
+    #
+    print("ALL_TAGS:%s"%tags)
+
+    return tags
 
 
 def _eval_build_statements(env,build_statements,node):
@@ -221,19 +246,22 @@ def _eval_build_statements(env,build_statements,node):
     :return: Boolean indicating whether the constraints are satisfied.
     """
 
+
     if not build_statements:
         return True
+
+    # pdb.set_trace()
 
     # Split each line into a list of space separated parts
     build_statement_parts = [bs.split(' ') for bs in build_statements]
 
+    all_tags = _get_all_tags(env)
     retval = True
 
-    # import pdb;pdb.set_trace()
     for line_parts in build_statement_parts:
         line = False
         for p in line_parts:
-            lpbool = [_eval_build_statement(env, pp) for pp in  p.split(',')]
+            lpbool = [_eval_build_statement(env, pp, all_tags) for pp in  p.split(',')]
             prv = reduce(lambda x, y: x and y,lpbool)
             print "PARTS:%s =>%s [%s]"%(p,prv,lpbool)
             line = line or prv
@@ -272,7 +300,6 @@ def imported_modules(node, env, path):
         return []
     print("BLAH:%s"%node.abspath)
 
-
     for m in m_import.finditer(content):
         match_dict = m.groupdict()
         if match_dict['paren']:
@@ -287,7 +314,6 @@ def imported_modules(node, env, path):
     if packages:
         print "packages:%s"%packages
 
-
     fixed_packages = []
     # Add filter to handle package renaming as such
     # import m "lib/math"         (where the contents of lib/math are accessible via m.SYMBOL
@@ -298,12 +324,10 @@ def imported_modules(node, env, path):
             p = p[quote_pos+1:]
         fixed_packages.append(p)
 
-
-    import_packages = [ gopackage for gopackage in fixed_packages if is_not_go_standard_library(env, gopackage)]
+    import_packages = [gopackage for gopackage in fixed_packages if is_not_go_standard_library(env, gopackage)]
 
     for gopackage in import_packages:
         deps += expand_go_packages_to_files(env,gopackage,path)
-
 
     return deps
 
@@ -383,10 +407,20 @@ def _get_go_version_vendor(env):
     env['GOHOSTARCH'] = go_arch
     env['GOVERSION'] = go_version
 
-    # print "All PACKAGES: %s" % all_packages
-    # print "    PACKAGES: %s" % proj_packages
-    # print "GlobPackages: %s" % system_packages
-    # print "PACKAGES: %s" % [s for s in stdout]
+
+def _get_go_env_values(env):
+    subp_env = _create_env_for_subprocess(env)
+
+    go_env_values = subprocess.check_output([env.subst('$GO'), "env"], env=subp_env).split(b'\n')
+
+    for var in go_env_values:
+        if not var: continue
+        # print("Line:%s"%var)
+        (variable,value) = var.split('=',1)
+        if (variable.startswith('GO') or variable == 'CGO_ENABLED') and variable not in ('GOPATH'):
+            # TODO: Decide if we stomp on any existing values here.
+            env[variable] = value[1:-1]
+            print("Setting: %s = %s"%(variable,env[variable]))
 
 
 def _go_emitter(target, source, env):
@@ -424,13 +458,15 @@ def generate(env):
     # Only need to set GOROOT if GO is not in your path..  check if there's a dirsep in the GO path
     # gcc go has implicit GOROOT and it's where --prefix pointed when built.
     # Only honor user provide GOROOT. otherwise don't specify.
-    env['ENV']['GOPATH'] = env.get('GOPATH','.')
+    env['ENV']['GOPATH'] = env['ENV'].get('GOPATH',env.get('GOPATH','.'))
 
     # Populate GO_SYSTEM_PACKAGES
     # TODO: Add documentation for GO_SYSTEM_PACKAGES
     _get_system_packages(env)
 
     _get_go_version_vendor(env)
+
+    _get_go_env_values(env)
 
     goSuffixes = [".go"]
 
@@ -498,6 +534,6 @@ def generate(env):
     # static_obj.add_emitter(go_suffix, SCons.Defaults.StaticObjectEmitter)
     # shared_obj.add_emitter(go_suffix, SCons.Defaults.SharedObjectEmitter)
 
-
 def exists(env):
+    print('GOBUILDER exists')
     return env.Detect("go") or env.Detect("gnugo")
