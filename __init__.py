@@ -101,8 +101,6 @@ def check_go_file(node,env):
 
     file_abspath = node.abspath
 
-    # node.attributes.go_checked_files = True
-
     if not include_go_file(env,node):
         process_file = False
 
@@ -119,6 +117,40 @@ def is_not_go_standard_library(env, packagename):
 
 
     return packagename not in env['GO_SYSTEM_PACKAGES']
+
+
+def parse_file(env,node):
+    """
+    Parse the file and get import and // +build statements
+    :param env:
+    :param node:
+    :return:
+    """
+
+    packages = []
+    build_statements = []
+    content = node.get_contents()
+
+    for b in m_build.finditer(content):
+        if b.group(1):
+            build_statements.append(b.group(1))
+
+    if len(build_statements) > 0:
+        print("+build statements (file:%s):%s"%(node.abspath,build_statements))
+
+    for m in m_import.finditer(content):
+        match_dict = m.groupdict()
+        if match_dict['paren']:
+            imports = [ x.strip(' "\t') for x in m.group(2).splitlines()]
+            # print "Import() ", " ".join(imports)
+            packages.extend(imports)
+        else:
+            # single line import statements
+            # print "Import \"\"", m.group(5)
+            packages.append(m.group(5))
+
+    node.attributes.go_packages = packages
+    node.attributes.go_build_statements = build_statements
 
 
 def include_go_file(env,file):
@@ -144,6 +176,11 @@ def include_go_file(env,file):
         include_file = False
     elif file_parts[-1] == env['GOARCH'] and file_parts[-2] != env['GOOS'] and file_parts[-2] in _goosList:
         include_file = False
+
+    if include_file:
+        # Cheap tests are done, now parse file and get build tags and import statements
+        parse_file(env,file)
+        include_file = _eval_build_statements(env, file)
 
     if not include_file:
         print "Rejecting: %s"%file.name
@@ -210,17 +247,10 @@ def _eval_build_statement(env,statement,all_tags):
     if statement in all_tags:
         retval = True
 
-    return inverted and retval or not retval
-
-    # OLD LOGIC
-    # if statement[0] == '!' and \
-    #         (statement[1:] not in (env['GOOS'],env['GOARCH'])) and \
-    #         (statement[1:] not in env.get('GOTAGS',[])):
-    #     return True
-    # elif statement in env['GOTAGS'] or statement in (env['GOOS'],env['GOARCH']):
-    #     return True
-    # else:
-    #     return False
+    if inverted:
+        return not retval
+    else:
+        return retval
 
 
 def _get_all_tags(env):
@@ -241,7 +271,7 @@ def _get_all_tags(env):
     return tags
 
 
-def _eval_build_statements(env,build_statements,node):
+def _eval_build_statements(env,node):
     """
     Process // +build statements in source files as follows:
     If more than one line of +build statements, then each lines logic is evaluated and
@@ -249,11 +279,14 @@ def _eval_build_statements(env,build_statements,node):
     If there is a commma between two items on a build line that indicates AND'ing them,
     otherwise all items space separated are OR'd.
     :param env:
-    :param build_statements:  A list of build statements, each one representing a line extracted from the source file
     :param node: The node being evaluated. Used for debug messaging.
     :return: Boolean indicating whether the constraints are satisfied.
     """
 
+    # if node.name.endswith('c.go'): pdb.set_trace()
+
+    # A list of build statements, each one representing a line extracted from the source file
+    build_statements = node.attributes.go_build_statements
 
     if not build_statements:
         return True
@@ -279,44 +312,26 @@ def _eval_build_statements(env,build_statements,node):
 
 
 def imported_modules(node, env, path):
+    """
+    Scan file for +build statements and also for import statements.
+    Store import statements on the node in node.attributes.go_imports
+    :param node: The file we are looking at
+    :param env:  Environment()
+    :param path:
+    :return:
+    """
     """ Find all the imported modules. """
 
     # Does the node exist yet?
     if not os.path.isfile(str(node)):
         return []
 
-    packages = []
     deps = []
-    build_statements = []
 
     # print "Paths to search: %s"%path
-    print("Node PATH      : %s (CGF:%s)"%(node.path,hasattr(node.attributes,'go_checked_files')))
+    print("Node PATH      : %s (CGF:%s)"%(node.path,hasattr(node.attributes,'go_packages')))
 
-    content = node.get_contents()
-
-    for b in m_build.finditer(content):
-        if b.group(1):
-            build_statements.append(b.group(1))
-
-    if len(build_statements) > 0:
-        print("+build statements (file:%s):%s"%(node.abspath,build_statements))
-
-    if not _eval_build_statements(env,build_statements,node):
-        print("SKIPPING %s"%node.abspath)
-        return []
-    print("BLAH:%s"%node.abspath)
-
-    for m in m_import.finditer(content):
-        match_dict = m.groupdict()
-        if match_dict['paren']:
-            imports = [ x.strip(' "\t') for x in m.group(2).splitlines()]
-            # print "Import() ", " ".join(imports)
-            packages.extend(imports)
-        else:
-            # single line import statements
-            # print "Import \"\"", m.group(5)
-            packages.append(m.group(5))
-
+    packages = node.attributes.go_packages
     if packages:
         print "packages:%s"%packages
 
@@ -330,10 +345,10 @@ def imported_modules(node, env, path):
             p = p[quote_pos+1:]
         fixed_packages.append(p)
 
-    import_packages = [gopackage for gopackage in fixed_packages if is_not_go_standard_library(env, gopackage)]
+    import_packages = [go_package for go_package in fixed_packages if is_not_go_standard_library(env, go_package)]
 
-    for gopackage in import_packages:
-        deps += expand_go_packages_to_files(env,gopackage,path)
+    for go_package in import_packages:
+        deps += expand_go_packages_to_files(env,go_package,path)
 
     return deps
 

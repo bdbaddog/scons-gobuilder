@@ -19,7 +19,7 @@ env.Tool('scons-gobuilder',toolpath=['../../..'],)
 
 # env.goObject('src/ex3/hello-world.go')
 
-env.goProgram('hello-world',['src/ex3/hello-world.go',])#,GOTAGS=['wolf'])
+env.goProgram('hello-world',['src/ex3/hello-world.go',],GOTAGS=['wolf'])
 # print("3GOPATH:"+env['GOPATH'])
 
 if False:
