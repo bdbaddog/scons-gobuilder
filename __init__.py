@@ -101,6 +101,8 @@ def check_go_file(node,env):
 
     file_abspath = node.abspath
 
+    # node.attributes.go_checked_files = True
+
     if not include_go_file(env,node):
         process_file = False
 
@@ -196,22 +198,29 @@ def _eval_build_statement(env,statement,all_tags):
     :param statement:
     :return: Boolean indicating if satisfied
     """
-    # pdb.set_trace()
 
     if statement is None:
         import pdb; pdb.set_trace()
 
-    invert = statement[0] == '!'
+    inverted = statement[0] == '!'
     retval = False
+    if inverted:
+        statement = statement[1:]
 
-    if statement[0] == '!' and \
-            (statement[1:] not in (env['GOOS'],env['GOARCH'])) and \
-            (statement[1:] not in env.get('GOTAGS',[])):
-        return True
-    elif statement in env['GOTAGS'] or statement in (env['GOOS'],env['GOARCH']):
-        return True
-    else:
-        return False
+    if statement in all_tags:
+        retval = True
+
+    return inverted and retval or not retval
+
+    # OLD LOGIC
+    # if statement[0] == '!' and \
+    #         (statement[1:] not in (env['GOOS'],env['GOARCH'])) and \
+    #         (statement[1:] not in env.get('GOTAGS',[])):
+    #     return True
+    # elif statement in env['GOTAGS'] or statement in (env['GOOS'],env['GOARCH']):
+    #     return True
+    # else:
+    #     return False
 
 
 def _get_all_tags(env):
@@ -227,8 +236,7 @@ def _get_all_tags(env):
     go_version = int(env['GOVERSION'].split('.')[1]) # strip '1.' and '.x' and just get middle version
     tags.extend(_goVersionTagsList[0:go_version])
 
-    #
-    print("ALL_TAGS:%s"%tags)
+    # print("ALL_TAGS:%s"%tags)
 
     return tags
 
@@ -249,8 +257,6 @@ def _eval_build_statements(env,build_statements,node):
 
     if not build_statements:
         return True
-
-    # pdb.set_trace()
 
     # Split each line into a list of space separated parts
     build_statement_parts = [bs.split(' ') for bs in build_statements]
@@ -284,7 +290,7 @@ def imported_modules(node, env, path):
     build_statements = []
 
     # print "Paths to search: %s"%path
-    print "Node PATH      : %s"%node.path
+    print("Node PATH      : %s (CGF:%s)"%(node.path,hasattr(node.attributes,'go_checked_files')))
 
     content = node.get_contents()
 
