@@ -37,6 +37,9 @@ import string
 import pdb
 import subprocess
 
+
+go_debug = False
+
 # Handle multiline import statements
 m_import = re.compile(r'import\s*(?P<paren>\()\s*(?P<package_names>[^\(]*?)(\))|import\s*(?P<quote>\")(?P<package_name>.*?)(\")', re.MULTILINE)
 
@@ -104,7 +107,7 @@ def check_go_file(node,env):
     if not include_go_file(env,node):
         process_file = False
 
-    print "check_go_File:%s  Process:%s"%(file_abspath,process_file)
+    if go_debug: print "check_go_File:%s  Process:%s"%(file_abspath,process_file)
 
     return process_file
 
@@ -136,7 +139,7 @@ def parse_file(env,node):
             build_statements.append(b.group(1))
 
     if len(build_statements) > 0:
-        print("+build statements (file:%s):%s"%(node.abspath,build_statements))
+        if go_debug: print("+build statements (file:%s):%s"%(node.abspath,build_statements))
 
     for m in m_import.finditer(content):
         match_dict = m.groupdict()
@@ -166,7 +169,7 @@ def include_go_file(env,file):
 
     # First filter based on file name
     file_parts = file.name.split('.')[0].split('_')
-    print "parts:%s"%file_parts
+    if go_debug: print "parts:%s"%file_parts
 
     if file_parts[-1] == 'test':
         include_file = False
@@ -183,7 +186,7 @@ def include_go_file(env,file):
         include_file = _eval_build_statements(env, file)
 
     if not include_file:
-        print "Rejecting: %s"%file.name
+        if go_debug: print "Rejecting: %s"%file.name
 
     return include_file
 
@@ -202,7 +205,7 @@ def expand_go_packages_to_files(env, gopackage, path):
     go_files = []
 
     for p in path:
-        print "Path:%s/src/%s"%(p,gopackage)
+        if go_debug: print "Path:%s/src/%s"%(p,gopackage)
         go_files = p.glob("src/%s/*.go"%gopackage)
         count=0
         for f in go_files:
@@ -218,7 +221,7 @@ def expand_go_packages_to_files(env, gopackage, path):
     try:
         go_files = [ f for f in go_files if include_go_file(env,f)]
     except TypeError as e:
-        print "TypeError is %s %s"%(e,f)
+        if go_debug: print "TypeError is %s %s"%(e,f)
     # print "done filtering test files"
     count = 0
     # for f in go_files:
@@ -302,11 +305,11 @@ def _eval_build_statements(env,node):
         for p in line_parts:
             lpbool = [_eval_build_statement(env, pp, all_tags) for pp in  p.split(',')]
             prv = reduce(lambda x, y: x and y,lpbool)
-            print "PARTS:%s =>%s [%s]"%(p,prv,lpbool)
+            if go_debug: print "PARTS:%s =>%s [%s]"%(p,prv,lpbool)
             line = line or prv
         retval = retval and line
 
-    print("_eval_build_statements:File:%s Process:%s"%(node.abspath,retval))
+        if go_debug: print("_eval_build_statements:File:%s Process:%s"%(node.abspath,retval))
 
     return retval
 
@@ -329,11 +332,11 @@ def imported_modules(node, env, path):
     deps = []
 
     # print "Paths to search: %s"%path
-    print("Node PATH      : %s (CGF:%s)"%(node.path,hasattr(node.attributes,'go_packages')))
+    if go_debug: print("Node PATH      : %s (CGF:%s)"%(node.path,hasattr(node.attributes,'go_packages')))
 
     packages = node.attributes.go_packages
     if packages:
-        print "packages:%s"%packages
+        if go_debug: print "packages:%s"%packages
 
     fixed_packages = []
     # Add filter to handle package renaming as such
@@ -441,7 +444,7 @@ def _get_go_env_values(env):
         if (variable.startswith('GO') or variable == 'CGO_ENABLED') and variable not in ('GOPATH'):
             # TODO: Decide if we stomp on any existing values here.
             env[variable] = value[1:-1]
-            print("Setting: %s = %s"%(variable,env[variable]))
+            if go_debug: print("Setting: %s = %s"%(variable,env[variable]))
 
 
 def _go_emitter(target, source, env):
@@ -456,7 +459,7 @@ def _go_tags(target, source, env, for_signature):
     :param env:
     :return:
     """
-    print("ForSig:%s TAGS:%s"%(for_signature,env['GOTAGS']))
+    if go_debug: print("ForSig:%s TAGS:%s"%(for_signature,env['GOTAGS']))
     retval = ''
     if env['GOTAGS']:
         retval = ' -tags "$GOTAGS" '
