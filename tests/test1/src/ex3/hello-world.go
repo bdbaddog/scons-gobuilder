@@ -1,5 +1,13 @@
 package main
-import "fmt"
+import (
+    "fmt"
+    "ex1"
+)
+
+import (
+	abc "xyz"
+)
+
 import (
     "ex1"
 )

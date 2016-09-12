@@ -38,7 +38,7 @@ import pdb
 import subprocess
 
 
-go_debug = False
+go_debug = True
 
 # Handle multiline import statements
 m_import = re.compile(r'import\s*(?P<paren>\()\s*(?P<package_names>[^\(]*?)(\))|import\s*(?P<quote>\")(?P<package_name>.*?)(\")', re.MULTILINE)
@@ -118,7 +118,6 @@ def is_not_go_standard_library(env, packagename):
 
     #TODO: What to do when there's a system package and a package in the project with the same name
 
-
     return packagename not in env['GO_SYSTEM_PACKAGES']
 
 
@@ -145,7 +144,10 @@ def parse_file(env,node):
         match_dict = m.groupdict()
         if match_dict['paren']:
             imports = [ x.strip(' "\t') for x in m.group(2).splitlines()]
-            # print "Import() ", " ".join(imports)
+            print("Import() ["+ ",".join(imports)+"]")
+
+            # Strip empty strings from array. This may happen due to newlines
+            imports = [i for i in imports if i != '']
             packages.extend(imports)
         else:
             # single line import statements

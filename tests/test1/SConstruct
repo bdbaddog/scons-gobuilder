@@ -13,7 +13,7 @@ env['GO'] = '/home/bdbaddog/tools/mongodbtoolchain/v2/bin/go'
 env['GOTAGS'] = ['bill','is','awesome']
 # env.AppendENVPath('PATH','/home/bdbaddog/tools/mongodbtoolchain/v2/bin')
 # print("1GOPATH:"+env['GOPATH'])
-env.Tool('scons-gobuilder',toolpath=['../../..'],)
+env.Tool('GoBuilder',toolpath=['../../..'],)
 
 # print("2GOPATH:"+env['GOPATH'])
 
