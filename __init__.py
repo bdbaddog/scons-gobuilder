@@ -38,10 +38,10 @@ import pdb
 import subprocess
 
 
-go_debug = True
+go_debug = False
 
 # Handle multiline import statements
-m_import = re.compile(r'import\s*(?P<paren>\()\s*(?P<package_names>[^\(]*?)(\))|import\s*(?P<quote>\")(?P<package_name>.*?)(\")', re.MULTILINE)
+m_import = re.compile(r'import\s*(?P<paren>\()\s*(?P<package_names>[^\(]*?)(\))|import\s*(?P<namespace>[^\"]*)?(?P<quote>\")(?P<package_name>.*?)(\")', re.MULTILINE)
 
 # Handle +build statements
 m_build = re.compile(r'\/\/\s*\+build\s(.*)')
@@ -143,16 +143,32 @@ def parse_file(env,node):
     for m in m_import.finditer(content):
         match_dict = m.groupdict()
         if match_dict['paren']:
-            imports = [ x.strip(' "\t') for x in m.group(2).splitlines()]
-            print("Import() ["+ ",".join(imports)+"]")
+            # imports = [x.strip(' "\t') for x in m.group(2).splitlines()]
+            lines = match_dict['package_names'].splitlines()
+            imports = []
+            for l in lines:
+                l = l.strip(' "\t')
+                if l == '': continue
+
+                # Handle multiline imports with namespaces by striping namespace
+                quote_pos = l.find('"')
+                if quote_pos != -1:
+                    l = l[quote_pos+1:]
+                imports.append(l)
+
+            if go_debug:
+                print("Import() ["+ ",".join(imports)+"]")
 
             # Strip empty strings from array. This may happen due to newlines
-            imports = [i for i in imports if i != '']
+            # imports = [i for i in imports if i != '']
             packages.extend(imports)
         else:
             # single line import statements
-            # print "Import \"\"", m.group(5)
-            packages.append(m.group(5))
+            if go_debug:
+                print "Import \"\"", m.group(5)
+            if go_debug and match_dict['namespace']:
+                print "NAMESPACE:%s"%match_dict['namespace']
+            packages.append(match_dict['package_name'])
 
     node.attributes.go_packages = packages
     node.attributes.go_build_statements = build_statements
