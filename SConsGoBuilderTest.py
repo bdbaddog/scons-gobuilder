@@ -1,9 +1,26 @@
 import collections
+import os.path
 
 import unittest
 import GoBuilder
 import TestUnit
 
+
+TESTDATA_DIRECTORY = os.path.join(os.path.dirname(__file__),'tests', 'testfiles')
+
+
+class GoDummyEnv(collections.UserDict):
+    def __init__(self,tags=[],goos='linux',goarch='amd64',goversion='1.6'):
+        collections.UserDict.__init__(self)
+        self['GOTAGS'] = tags
+        self['GOOS'] = goos
+        self['GOARCH'] = goarch
+        self['GOVERSION'] = goversion
+
+    # def subst(self, key):
+    #     if key[0] == '$':
+    #         return self[key[1:]]
+    #     return key
 
 class DummyNode(object):
     """
@@ -29,13 +46,11 @@ class DummyNode(object):
 class TestImportParsing(unittest.TestCase):
 
     def test_single_line_imports(self):
-        test_node=DummyNode(name='xyz.go',contents="""
-package main
-import "sli"
-        """)
+        with open(os.path.join(TESTDATA_DIRECTORY,'test_single_line_imports.go'),'r') as sli:
+            test_node=DummyNode(name='xyz.go',contents=sli.read())
 
-        GoBuilder.parse_file(None, test_node)
-        self.assertEqual(test_node.attributes.go_packages,['sli'])
+            GoBuilder.parse_file(None, test_node)
+            self.assertEqual(test_node.attributes.go_packages,['sli'])
 
     def test_multi_line_imports(self):
         test_node = DummyNode(name='xyz.go', contents="import (\n\t\"mli\"\n\t)")
@@ -54,10 +69,30 @@ import "sli"
         self.assertEqual(test_node.attributes.go_packages, ['mlni'])
 
 
+class TestBuildTagParsing(unittest.TestCase):
+    def test_single_build_tag(self):
+        with open(os.path.join(TESTDATA_DIRECTORY,'test_single_build_tag.go'),'r') as sli:
+            test_node=DummyNode(name='xyz.go',contents=sli.read())
+
+            GoBuilder.parse_file(None, test_node)
+            self.assertEqual(test_node.attributes.go_build_statements,['wolf'])
+
+            testenv = GoDummyEnv()
+
+            include_file = GoBuilder._eval_build_statements(testenv,test_node)
+            self.assertFalse(include_file,'Failed testing negative for build tag wolf')
+
+            testenv['GOTAGS'] = ['wolf']
+
+            include_file = GoBuilder._eval_build_statements(testenv, test_node)
+            self.assertTrue(include_file, 'Failed testing positive for build tag wolf')
+
+
 def suite():
     suite = unittest.TestSuite()
     tclasses = [
         TestImportParsing,
+        TestBuildTagParsing,
                ]
     for tclass in tclasses:
         names = unittest.getTestCaseNames(tclass, 'test_')
