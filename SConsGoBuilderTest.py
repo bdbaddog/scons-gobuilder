@@ -194,6 +194,24 @@ class TestBuildTagParsing(unittest.TestCase):
         include_file = GoBuilder._eval_build_statements(testenv, test_node)
         self.assertFalse(include_file, 'Failed testing negative for single line comma ANDed build tags')
 
+    def test_go_single_line_nanded_build_tag_eval(self):
+        test_node = GoDummyNode(name='xyz.go', contents='package testfiles\n\n// +build !wolf,bear')
+        testenv = GoDummyEnv(gotags=['bear'])
+
+        GoBuilder.parse_file(None, test_node)
+
+        include_file = GoBuilder._eval_build_statements(testenv, test_node)
+        self.assertTrue(include_file, 'Failed testing positive for single line comma ANDed build tags')
+
+    def test_go_single_line_negative_nanded_build_tag_eval(self):
+        test_node = GoDummyNode(name='xyz.go', contents='package testfiles\n\n// +build !wolf,bear')
+        testenv = GoDummyEnv()
+        GoBuilder.parse_file(None, test_node)
+
+        include_file = GoBuilder._eval_build_statements(testenv, test_node)
+        self.assertFalse(include_file, 'Failed testing negative for single line comma ANDed build tags')
+
+
     def test_go_single_line_ored_build_tag_eval(self):
         test_node = GoDummyNode(name='xyz.go', contents='package testfiles\n\n// +build wolf bear')
         testenv = GoDummyEnv(gotags=['wolf', 'bear'])
