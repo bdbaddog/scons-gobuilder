@@ -169,7 +169,9 @@ class TestBuildTagParsing(unittest.TestCase):
     def test_go_version_negative_build_tag_eval(self):
         test_node = GoDummyNode(name='xyz.go', contents='package testfiles\n\n// +build go1.6')
         testenv = GoDummyEnv()
-        testenv['GOVERSION'] = '1.7'
+        # All go tags are defined up to the current version and so we must test
+        # using a version lower than the required version to force a failure
+        testenv['GOVERSION'] = '1.4'
         GoBuilder.parse_file(None, test_node)
 
         include_file = GoBuilder._eval_build_statements(testenv, test_node)
