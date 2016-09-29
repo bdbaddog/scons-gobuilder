@@ -177,22 +177,73 @@ class TestBuildTagParsing(unittest.TestCase):
         include_file = GoBuilder._eval_build_statements(testenv, test_node)
         self.assertFalse(include_file, 'Failed testing negative for build go version tag')
 
-    def test_anded_build_tag_eval(self):
+    def test_go_single_line_anded_build_tag_eval(self):
         test_node = GoDummyNode(name='xyz.go', contents='package testfiles\n\n// +build wolf,bear')
         testenv = GoDummyEnv(gotags=['wolf','bear'])
 
         GoBuilder.parse_file(None, test_node)
 
         include_file = GoBuilder._eval_build_statements(testenv, test_node)
-        self.assertTrue(include_file, 'Failed testing positive for single line comma ANDED build tags')
+        self.assertTrue(include_file, 'Failed testing positive for single line comma ANDed build tags')
 
-    def test_negative_anded_build_tag_eval(self):
+    def test_go_single_line_negative_anded_build_tag_eval(self):
         test_node = GoDummyNode(name='xyz.go', contents='package testfiles\n\n// +build wolf,bear')
         testenv = GoDummyEnv()
         GoBuilder.parse_file(None, test_node)
 
         include_file = GoBuilder._eval_build_statements(testenv, test_node)
-        self.assertFalse(include_file, 'Failed testing negative for single line comma ANDED build tags')
+        self.assertFalse(include_file, 'Failed testing negative for single line comma ANDed build tags')
+
+    def test_go_single_line_ored_build_tag_eval(self):
+        test_node = GoDummyNode(name='xyz.go', contents='package testfiles\n\n// +build wolf bear')
+        testenv = GoDummyEnv(gotags=['wolf', 'bear'])
+
+        GoBuilder.parse_file(None, test_node)
+
+        include_file = GoBuilder._eval_build_statements(testenv, test_node)
+        self.assertTrue(include_file, 'Failed testing positive for single line comma ORed build tags')
+
+    def test_go_single_line_negative_ored_build_tag_eval(self):
+        test_node = GoDummyNode(name='xyz.go', contents='package testfiles\n\n// +build wolf bear')
+        testenv = GoDummyEnv()
+        GoBuilder.parse_file(None, test_node)
+
+        include_file = GoBuilder._eval_build_statements(testenv, test_node)
+        self.assertFalse(include_file, 'Failed testing negative for single line comma ORed build tags')
+
+    def test_go_two_line_anded_build_tag_eval(self):
+        test_node = GoDummyNode(name='xyz.go', contents='package testfiles\n\n// +build wolf\n// +build bear')
+        testenv = GoDummyEnv(gotags=['wolf', 'bear'])
+
+        GoBuilder.parse_file(None, test_node)
+
+        include_file = GoBuilder._eval_build_statements(testenv, test_node)
+        self.assertTrue(include_file, 'Failed testing positive for two line ANDed build tags')
+
+    def test_go_two_line_negative_anded_build_tag_eval(self):
+        test_node = GoDummyNode(name='xyz.go', contents='package testfiles\n\n// +build wolf\n// +build bear')
+        testenv = GoDummyEnv()
+        GoBuilder.parse_file(None, test_node)
+
+        include_file = GoBuilder._eval_build_statements(testenv, test_node)
+        self.assertFalse(include_file, 'Failed testing negative for two line build tags')
+
+    def test_go_two_line_ored_build_tag_eval(self):
+        test_node = GoDummyNode(name='xyz.go', contents='package testfiles\n\n// +build wolf zebra\n// +build bear')
+        testenv = GoDummyEnv(gotags=['wolf', 'bear','zebra'])
+
+        GoBuilder.parse_file(None, test_node)
+
+        include_file = GoBuilder._eval_build_statements(testenv, test_node)
+        self.assertTrue(include_file, 'Failed testing positive for two line space ORed build tags')
+
+    def test_go_two_line_negative_ored_build_tag_eval(self):
+        test_node = GoDummyNode(name='xyz.go', contents='package testfiles\n\n// +build wolf zebra\n// +build bear')
+        testenv = GoDummyEnv()
+        GoBuilder.parse_file(None, test_node)
+
+        include_file = GoBuilder._eval_build_statements(testenv, test_node)
+        self.assertFalse(include_file, 'Failed testing negative for two line space ORed build tags')
 
 
 def suite():
