@@ -150,7 +150,7 @@ def parse_file(env,node):
                 l = l.strip(' "\t')
                 if l == '': continue
 
-                # Handle multiline imports with namespaces by striping namespace
+                # Handle multi-line imports with namespaces by striping namespace
                 quote_pos = l.find('"')
                 if quote_pos != -1:
                     l = l[quote_pos+1:]
@@ -297,7 +297,7 @@ def _eval_build_statements(env,node):
     Process // +build statements in source files as follows:
     If more than one line of +build statements, then each lines logic is evaluated and
     then AND'd with all other lines.
-    If there is a commma between two items on a build line that indicates AND'ing them,
+    If there is a comma between two items on a build line that indicates AND'ing them,
     otherwise all items space separated are OR'd.
     :param env:
     :param node: The node being evaluated. Used for debug messaging.
